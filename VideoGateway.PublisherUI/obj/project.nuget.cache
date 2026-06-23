@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "IA7BwIZ61RA=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\azadi\\source\\repos\\DdsVideoGatewaySystem\\VideoGateway.PublisherUI\\VideoGateway.PublisherUI.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\azadi\\.nuget\\packages\\libvlcsharp\\3.10.0\\libvlcsharp.3.10.0.nupkg.sha512",
+    "C:\\Users\\azadi\\.nuget\\packages\\libvlcsharp.winforms\\3.10.0\\libvlcsharp.winforms.3.10.0.nupkg.sha512",
+    "C:\\Users\\azadi\\.nuget\\packages\\videolan.libvlc.windows\\3.0.23.1\\videolan.libvlc.windows.3.0.23.1.nupkg.sha512"
+  ],
+  "logs": []
+}

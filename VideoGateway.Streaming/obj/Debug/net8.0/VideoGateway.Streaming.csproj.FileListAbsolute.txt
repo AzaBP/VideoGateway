@@ -1,0 +1,15 @@
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\bin\Debug\net8.0\VideoGateway.Streaming.deps.json
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\bin\Debug\net8.0\VideoGateway.Streaming.dll
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\bin\Debug\net8.0\VideoGateway.Streaming.pdb
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\bin\Debug\net8.0\VideoGateway.Engine.dll
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\bin\Debug\net8.0\VideoGateway.Engine.pdb
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\obj\Debug\net8.0\VideoGateway.Streaming.csproj.AssemblyReference.cache
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\obj\Debug\net8.0\VideoGateway.Streaming.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\obj\Debug\net8.0\VideoGateway.Streaming.AssemblyInfoInputs.cache
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\obj\Debug\net8.0\VideoGateway.Streaming.AssemblyInfo.cs
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\obj\Debug\net8.0\VideoGateway.Streaming.csproj.CoreCompileInputs.cache
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\obj\Debug\net8.0\VideoGat.A554D5C5.Up2Date
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\obj\Debug\net8.0\VideoGateway.Streaming.dll
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\obj\Debug\net8.0\refint\VideoGateway.Streaming.dll
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\obj\Debug\net8.0\VideoGateway.Streaming.pdb
+C:\Users\azadi\source\repos\DdsVideoGatewaySystem\VideoGateway.Streaming\obj\Debug\net8.0\ref\VideoGateway.Streaming.dll

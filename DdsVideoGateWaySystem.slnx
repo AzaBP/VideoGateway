@@ -1,0 +1,10 @@
+<Solution>
+  <Project Path="DdsVideoGateWaySystem/DdsVideoGateWaySystem.csproj" />
+  <Project Path="VideoGateway.Console/VideoGateway.Console.csproj" />
+  <Project Path="VideoGateway.Dds/VideoGateway.Dds.csproj" />
+  <Project Path="VideoGateway.Engine/VideoGateway.Engine.csproj" />
+  <Project Path="VideoGateway.PublisherUI/VideoGateway.PublisherUI.csproj" />
+  <Project Path="VideoGateway.Streaming/VideoGateway.Streaming.csproj" />
+  <Project Path="VideoGateway.SubscriberUI/VideoGateway.SubscriberUI.csproj" />
+  <Project Path="VideoGateway.Testing.Common/VideoGateway.Testing.Common.csproj" />
+</Solution>

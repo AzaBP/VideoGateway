@@ -1,0 +1,56 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "VideoGateway.Console/1.0.0": {
+        "dependencies": {
+          "VideoGateway.Engine": "1.0.0",
+          "VideoGateway.Streaming": "1.0.0"
+        },
+        "runtime": {
+          "VideoGateway.Console.dll": {}
+        }
+      },
+      "VideoGateway.Engine/1.0.0": {
+        "runtime": {
+          "VideoGateway.Engine.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "VideoGateway.Streaming/1.0.0": {
+        "dependencies": {
+          "VideoGateway.Engine": "1.0.0"
+        },
+        "runtime": {
+          "VideoGateway.Streaming.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "VideoGateway.Console/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "VideoGateway.Engine/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "VideoGateway.Streaming/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
