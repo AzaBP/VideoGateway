@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
+using System.Net;
+using System.Net.Sockets;
 using System.Windows.Forms;
 using VideoGateway.Testing.Common;
 using LibVLCSharp.Shared;
@@ -541,6 +543,23 @@ namespace VideoGateway.PublisherUI
             AppendLog($"Destino:    {rtsp}");
             AppendLog($"Comando:    ffmpeg {args}");
             AppendLog(new string('─', 60));
+
+            // Send the input URL to any running Subscriber via UDP so it can auto-connect.
+            try
+            {
+                var subscriberHost = Environment.GetEnvironmentVariable("VIDEOGATEWAY_SUBSCRIBER_HOST") ?? "127.0.0.1";
+                var subscriberPortStr = Environment.GetEnvironmentVariable("VIDEOGATEWAY_SUBSCRIBER_PORT");
+                var subscriberPort = 50000;
+                if (!string.IsNullOrEmpty(subscriberPortStr) && int.TryParse(subscriberPortStr, out var p)) subscriberPort = p;
+                using var udp = new UdpClient();
+                var msg = Encoding.UTF8.GetBytes(file);
+                udp.Send(msg, msg.Length, subscriberHost, subscriberPort);
+                AppendLog($"UDP: sent URL to {subscriberHost}:{subscriberPort}");
+            }
+            catch (Exception ex)
+            {
+                AppendLog("UDP send failed: " + ex.Message);
+            }
 
             // Switch to logs tab
             var tabs = _txtLogs.Parent?.Parent as TabControl;
