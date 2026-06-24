@@ -1,0 +1,29 @@
+.vs/
+bin/
+obj/
+*.user
+*.sourcelink.json
+*.log
+*.tmp
+*.cache
+packages/
+*.nupkg
+.vscode/
+*.DS_Store
+
+# .NET / Visual Studio specifics
+*.user
+*.suo
+*.userosscache
+*.sln.ide
+
+# LibVLC / VideoLAN native outputs (no subir)
+**/libvlc/
+**/libvlc/**/*
+**/plugins/**
+
+# Other
+*.exe
+*.dll
+*.pdb
+

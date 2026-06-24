@@ -481,7 +481,23 @@ namespace VideoGateway.PublisherUI
             _btnPublish.Click += BtnPublish_Click;
             _btnStop.Click    += BtnStop_Click;
             _btnConfig.Click  += (_, _) => { using var d = new SettingsForm(); d.ShowDialog(this); };
-            _btnPreview.Click += (_, _) => { if (_selectedCard != null) PlayFile(_selectedCard.FilePath); };
+            _btnPreview.Click += (_, _) =>
+            {
+                var url = _txtInputUrl.Text?.Trim();
+                if (!string.IsNullOrEmpty(url))
+                {
+                    PlayFile(url);
+                    return;
+                }
+
+                if (_selectedCard != null)
+                {
+                    PlayFile(_selectedCard.FilePath);
+                    return;
+                }
+
+                MessageBox.Show("Selecciona un vídeo o pega una URL de stream para previsualizar.", "Preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            };
             _btnStopPb.Click  += (_, _) => { try { _mediaPlayer?.Stop(); } catch { } SetStatus("Reproducción detenida.", TextColor); };
             _trkVolume.Scroll += (_, _) => { try { if (_mediaPlayer != null) _mediaPlayer.Volume = _trkVolume.Value; } catch { } };
         }
@@ -547,7 +563,14 @@ namespace VideoGateway.PublisherUI
             {
                 try
                 {
-                    _mediaPlayer.Play(new Media(_libVLC, new Uri(file)));
+                    var media = new Media(_libVLC, file, FromType.FromLocation);
+                    // For RTSP streams prefer UDP transport (user requirement)
+                    if (file.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        media.AddOption(":rtsp-transport=udp");
+                        media.AddOption(":network-caching=3000");
+                    }
+                    _mediaPlayer.Play(media);
                     _mediaPlayer.Volume = _trkVolume.Value;
                     SetStatus($"▶  Preview: {Path.GetFileName(file)}", AccentBlue);
                     return;
