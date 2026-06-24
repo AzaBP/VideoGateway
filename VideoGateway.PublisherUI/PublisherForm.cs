@@ -43,6 +43,7 @@ namespace VideoGateway.PublisherUI
         private readonly Button  _btnBrowse  = new() { Text = "📂  Examinar"   };
         private readonly Button  _btnConfig  = new() { Text = "⚙  Config"      };
         private readonly Label   _lblStatus  = new() { AutoSize = false         };
+        private readonly Label   _lblFormatOut = new() { AutoSize = false };
 
         // ── Detail panel controls ────────────────────────────────────────────────
         private readonly TextBox _txtMetadata = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
@@ -284,6 +285,13 @@ namespace VideoGateway.PublisherUI
             var lblVol = new Label { Text = "Vol:", ForeColor = DimTextColor, AutoSize = true, Padding = new Padding(6, 4, 0, 0) };
             StyleTrackBar(_trkVolume); _trkVolume.Height = 22;
             pbBar.Controls.AddRange(new Control[] { _btnPreview, _btnStopPb, lblVol, _trkVolume });
+
+            // Format label (shows detected outgoing codecs)
+            StyleLabel(_lblFormatOut);
+            _lblFormatOut.Dock = DockStyle.Top;
+            _lblFormatOut.Height = 20;
+            _lblFormatOut.Text = "Formato a enviar: -";
+            panel.Controls.Add(_lblFormatOut);
 
             // Video view
             try
@@ -541,7 +549,10 @@ namespace VideoGateway.PublisherUI
             try
             {
                 var (vcodec, acodec) = VideoGateway.Testing.Common.MediaInfo.DetectCodecsWithFfprobe(file);
-                AppendLog($"Formato a enviar: video={(vcodec ?? "unknown")}, audio={(acodec ?? "unknown")}");
+                var v = vcodec ?? "unknown";
+                var a = acodec ?? "unknown";
+                AppendLog($"Formato a enviar: video={v}, audio={a}");
+                try { _lblFormatOut.Text = $"Formato a enviar: video={v}, audio={a}"; } catch { }
                 if (!string.Equals(vcodec, "h264", StringComparison.OrdinalIgnoreCase) || !string.Equals(acodec, "aac", StringComparison.OrdinalIgnoreCase))
                 {
                     AppendLog("Nota: formato no nativo H.264/AAC — se aplicará transcodificación según la configuración.");

@@ -40,6 +40,7 @@ namespace VideoGateway.SubscriberUI
         private readonly Label    _lblStatus = new() { AutoSize = false       };
         private readonly Label    _lblInfo   = new() { AutoSize = false       };
         private readonly TextBox  _txtLog    = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
+        private readonly Label     _lblFormatIn = new() { AutoSize = false };
 
         // Embedded player
         private VideoView?   _videoView;
@@ -296,6 +297,13 @@ namespace VideoGateway.SubscriberUI
             // At startup we do not block trying to load native LibVLC synchronously
             // Create a placeholder label; LibVLC will be initialized asynchronously
             _vlcAvailable = false;
+            // Format label above the video view
+            StyleLabel(_lblFormatIn);
+            _lblFormatIn.Dock = DockStyle.Top;
+            _lblFormatIn.Height = 20;
+            _lblFormatIn.Text = "Formato recibido: -";
+            panel.Controls.Add(_lblFormatIn);
+
             var placeholder = new Label
             {
                 Text      = "Cargando reproductor embebido...",
@@ -354,7 +362,10 @@ namespace VideoGateway.SubscriberUI
             try
             {
                 var (vcodec, acodec) = VideoGateway.Testing.Common.MediaInfo.DetectCodecsWithFfprobe(url);
-                AppendLog($"Formato recibido: video={(vcodec ?? "unknown")}, audio={(acodec ?? "unknown")}.");
+                var v = vcodec ?? "unknown";
+                var a = acodec ?? "unknown";
+                AppendLog($"Formato recibido: video={v}, audio={a}.");
+                try { _lblFormatIn.Text = $"Formato recibido: video={v}, audio={a}"; } catch { }
                 if (!string.Equals(vcodec, "h264", StringComparison.OrdinalIgnoreCase) || !string.Equals(acodec, "aac", StringComparison.OrdinalIgnoreCase))
                 {
                     AppendLog("[WARN] Formato recibido no es H.264/AAC. Puede no ser compatible con algunos clientes RTSP/VLC.");
