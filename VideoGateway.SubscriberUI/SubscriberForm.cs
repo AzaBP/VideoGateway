@@ -363,6 +363,17 @@ namespace VideoGateway.SubscriberUI
                 try
                 {
                     var media = new Media(_libVLC, url, FromType.FromLocation);
+                    // Try to detect resolution via ffprobe and force aspect ratio so the full image is visible (letterbox)
+                    try
+                    {
+                        var res = VideoGateway.Testing.Common.MediaInfo.DetectVideoResolutionWithFfprobe(url);
+                        if (res.HasValue)
+                        {
+                            media.AddOption($":aspect-ratio={res.Value.width}:{res.Value.height}");
+                            AppendLog($"Forzando aspect-ratio {res.Value.width}:{res.Value.height} para mostrar imagen completa.");
+                        }
+                    }
+                    catch { }
                     // Prefer UDP transport and increase cache for unstable networks
                     media.AddOption(":rtsp-transport=udp");
                     media.AddOption(":network-caching=3000");

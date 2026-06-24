@@ -31,6 +31,39 @@ namespace VideoGateway.Testing.Common
         }
 
         /// <summary>
+        /// Attempts to retrieve the first video stream's width and height using ffprobe.
+        /// Returns null on failure or when ffprobe is not available.
+        /// </summary>
+        public static (int width, int height)? DetectVideoResolutionWithFfprobe(string path)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "ffprobe",
+                    Arguments = $"-v error -select_streams v:0 -show_entries stream=width,height -of default=nw=1:nk=1 \"{path}\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using var p = Process.Start(psi);
+                if (p == null) return null;
+                var outp = p.StandardOutput.ReadToEnd();
+                p.WaitForExit(2000);
+                if (string.IsNullOrWhiteSpace(outp)) return null;
+                var lines = outp.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+                if (lines.Length >= 2 && int.TryParse(lines[0].Trim(), out var w) && int.TryParse(lines[1].Trim(), out var h))
+                {
+                    return (w, h);
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        /// <summary>
         /// If ffprobe is available in PATH, attempts to retrieve codec_name for the first video stream.
         /// Falls back to extension-based detection on any error.
         /// </summary>
