@@ -182,9 +182,11 @@ namespace VideoGateway.SubscriberUI
         {
             try
             {
-                _libVLC      = new LibVLC();
+                // Initialize LibVLC with verbose logging so we can capture detailed errors
+                _libVLC = new LibVLC(new[] { "--verbose=2" });
+                _libVLC.Log += (s, e) => AppendLog($"VLC: {e.Message}");
                 _mediaPlayer = new MediaPlayer(_libVLC);
-                _videoView   = new VideoView { MediaPlayer = _mediaPlayer, Dock = DockStyle.Fill };
+                _videoView = new VideoView { MediaPlayer = _mediaPlayer, Dock = DockStyle.Fill };
                 panel.Controls.Add(_videoView);
                 _vlcAvailable = true;
             }
@@ -246,11 +248,37 @@ namespace VideoGateway.SubscriberUI
 
             AppendLog($"Conectando a: {url} …");
 
+            // Detect input format with ffprobe (if available) and log it to help debugging
+            try
+            {
+                var fmt = VideoGateway.Testing.Common.MediaInfo.DetectFormatWithFfprobe(url);
+                AppendLog($"Formato detectado (entrada): {fmt}");
+            }
+            catch { }
+
             if (_vlcAvailable && _mediaPlayer != null && _libVLC != null)
             {
                 try
                 {
                     var media = new Media(_libVLC, url, FromType.FromLocation);
+                    // Prefer UDP transport and increase cache for unstable networks
+                    media.AddOption(":rtsp-transport=udp");
+                    media.AddOption(":network-caching=3000");
+                    media.AddOption(":no-video-title-show");
+
+                    // Parse media metadata (network) to provide codec/stream info when possible
+                    media.ParsedChanged += (_, __) =>
+                    {
+                        try
+                        {
+                            AppendLog("Media parsed (network). See ffprobe for detailed streams.");
+                        }
+                        catch { }
+                    };
+
+                    // Request parsing in background (non-blocking)
+                    try { media.Parse(MediaParseOptions.ParseNetwork); } catch { }
+
                     _mediaPlayer.Stop();
                     _mediaPlayer.Play(media);
                     _mediaPlayer.Volume = _trkVolume.Value;
