@@ -1,6 +1,11 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using VideoGateway.Testing.Common;
 using LibVLCSharp.Shared;
 using LibVLCSharp.WinForms;
@@ -41,6 +46,9 @@ namespace VideoGateway.SubscriberUI
         private LibVLC?      _libVLC;
         private MediaPlayer? _mediaPlayer;
         private bool         _vlcAvailable;
+        // UDP listener for dynamic URL reception
+        private CancellationTokenSource? _udpListenerCts;
+        private const int UdpListenerPort = 50000;
 
         // ─────────────────────────────────────────────────────────────────────────
         public SubscriberForm()
@@ -55,8 +63,73 @@ namespace VideoGateway.SubscriberUI
 
             BuildLayout();
             WireEvents();
+            StartUdpUrlListener();
             AppendLog("Subscriber listo. Introduce una URL RTSP y pulsa Conectar.");
             AppendLog($"Formato recomendado: H.264 / AAC — compatible con MediaMTX, VLC y FFplay.");
+        }
+
+        private void StartUdpUrlListener()
+        {
+            try
+            {
+                _udpListenerCts = new CancellationTokenSource();
+                var ct = _udpListenerCts.Token;
+                Task.Run(async () =>
+                {
+                    using var client = new UdpClient(UdpListenerPort);
+                    AppendLog($"UDP URL listener started on port {UdpListenerPort} (send a plain URL or JSON {{\"url\":\"rtsp://...\"}}).");
+                    while (!ct.IsCancellationRequested)
+                    {
+                        try
+                        {
+                            var res = await client.ReceiveAsync(ct);
+                            var text = string.Empty;
+                            try { text = Encoding.UTF8.GetString(res.Buffer).Trim(); } catch { }
+                            if (string.IsNullOrWhiteSpace(text)) continue;
+
+                            // Accept either raw URL or JSON with a url field
+                            string? url = null;
+                            if (text.StartsWith("{"))
+                            {
+                                try
+                                {
+                                    // crude JSON parse to avoid adding dependencies
+                                    var idx = text.IndexOf("\"url\"", StringComparison.OrdinalIgnoreCase);
+                                    if (idx >= 0)
+                                    {
+                                        var colon = text.IndexOf(':', idx);
+                                        if (colon >= 0)
+                                        {
+                                            var start = text.IndexOf('"', colon + 1);
+                                            var end = text.IndexOf('"', start + 1);
+                                            if (start >= 0 && end > start) url = text.Substring(start + 1, end - start - 1);
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+                            else
+                            {
+                                url = text;
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(url))
+                            {
+                                BeginInvoke(() =>
+                                {
+                                    AppendLog($"UDP: received URL -> {url}");
+                                    _txtRtsp.Text = url;
+                                    // Auto-connect: simulate play click
+                                    try { BtnPlay_Click(this, EventArgs.Empty); } catch { }
+                                });
+                            }
+                        }
+                        catch (OperationCanceledException) { break; }
+                        catch (Exception ex) { AppendLog("UDP listener error: " + ex.Message); await Task.Delay(500, ct); }
+                    }
+                }, ct);
+            }
+            catch (Exception ex) { AppendLog("Unable to start UDP listener: " + ex.Message); }
         }
 
         // ── Layout ───────────────────────────────────────────────────────────────
@@ -266,18 +339,28 @@ namespace VideoGateway.SubscriberUI
                     media.AddOption(":network-caching=3000");
                     media.AddOption(":no-video-title-show");
 
-                    // Parse media metadata (network) to provide codec/stream info when possible
+                    // Parse media metadata asynchronously to avoid blocking the UI thread.
+                    var parsed = false;
                     media.ParsedChanged += (_, __) =>
                     {
                         try
                         {
+                            parsed = true;
                             AppendLog("Media parsed (network). See ffprobe for detailed streams.");
                         }
                         catch { }
                     };
 
-                    // Request parsing in background (non-blocking)
-                    try { media.Parse(MediaParseOptions.ParseNetwork); } catch { }
+                    // Use background parsing to avoid blocking the UI thread
+                    Task.Run(() =>
+                    {
+                        try { media.Parse(MediaParseOptions.ParseNetwork); } catch { }
+                    });
+                    Task.Run(async () =>
+                    {
+                        await Task.Delay(5000);
+                        if (!parsed) AppendLog("Warning: media parse timeout (still waiting for metadata).");
+                    });
 
                     _mediaPlayer.Stop();
                     _mediaPlayer.Play(media);
@@ -440,6 +523,7 @@ namespace VideoGateway.SubscriberUI
         {
             base.OnFormClosing(e);
             try { _mediaPlayer?.Stop(); _mediaPlayer?.Dispose(); _libVLC?.Dispose(); _videoView?.Dispose(); } catch { }
+            try { _udpListenerCts?.Cancel(); _udpListenerCts?.Dispose(); } catch { }
         }
     }
 }
