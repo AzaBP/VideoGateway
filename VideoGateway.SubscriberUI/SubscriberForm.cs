@@ -64,8 +64,48 @@ namespace VideoGateway.SubscriberUI
             BuildLayout();
             WireEvents();
             StartUdpUrlListener();
+            // Initialize LibVLC asynchronously to avoid startup hangs
+            Task.Run(() => TryInitializeLibVLCAsync());
             AppendLog("Subscriber listo. Introduce una URL RTSP y pulsa Conectar.");
             AppendLog($"Formato recomendado: H.264 / AAC — compatible con MediaMTX, VLC y FFplay.");
+        }
+
+        private void TryInitializeLibVLCAsync()
+        {
+            try
+            {
+                // Attempt to create LibVLC in background; if it succeeds, create UI controls on UI thread
+                var lib = new LibVLC(new[] { "--verbose=2" });
+                lib.Log += (s, e) => AppendLog($"VLC: {e.Message}");
+                var mediaPlayer = new MediaPlayer(lib);
+                BeginInvoke(() =>
+                {
+                    try
+                    {
+                        _libVLC = lib;
+                        _mediaPlayer = mediaPlayer;
+                        // Remove existing placeholder and add VideoView
+                        if (_videoView != null) { }
+                        var parent = Controls.OfType<SplitContainer>().FirstOrDefault()?.Panel1;
+                        if (parent != null)
+                        {
+                            parent.Controls.Clear();
+                            _videoView = new VideoView { MediaPlayer = _mediaPlayer, Dock = DockStyle.Fill };
+                            parent.Controls.Add(_videoView);
+                        }
+                        _vlcAvailable = true;
+                        AppendLog("LibVLC inicializado correctamente.");
+                    }
+                    catch (Exception ex)
+                    {
+                        AppendLog("Error inicializando UI LibVLC: " + ex.Message);
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                AppendLog("LibVLC native init failed: " + ex.Message);
+            }
         }
 
         private void StartUdpUrlListener()
@@ -253,29 +293,18 @@ namespace VideoGateway.SubscriberUI
 
         private void BuildVideoPanel(SplitterPanel panel)
         {
-            try
+            // At startup we do not block trying to load native LibVLC synchronously
+            // Create a placeholder label; LibVLC will be initialized asynchronously
+            _vlcAvailable = false;
+            var placeholder = new Label
             {
-                // Initialize LibVLC with verbose logging so we can capture detailed errors
-                _libVLC = new LibVLC(new[] { "--verbose=2" });
-                _libVLC.Log += (s, e) => AppendLog($"VLC: {e.Message}");
-                _mediaPlayer = new MediaPlayer(_libVLC);
-                _videoView = new VideoView { MediaPlayer = _mediaPlayer, Dock = DockStyle.Fill };
-                panel.Controls.Add(_videoView);
-                _vlcAvailable = true;
-            }
-            catch
-            {
-                _vlcAvailable = false;
-                var lbl = new Label
-                {
-                    Text      = "Reproductor embebido no disponible.\n(LibVLC nativo no cargado)\n\nUsa el botón \"VLC ext.\" para abrir externamente.",
-                    ForeColor = AccentRed,
-                    Dock      = DockStyle.Fill,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    Font      = new Font("Segoe UI", 10.5F, FontStyle.Bold)
-                };
-                panel.Controls.Add(lbl);
-            }
+                Text      = "Cargando reproductor embebido...",
+                ForeColor = DimTextColor,
+                Dock      = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font      = new Font("Segoe UI", 10.5F, FontStyle.Regular)
+            };
+            panel.Controls.Add(placeholder);
         }
 
         private void BuildLogPanel(SplitterPanel panel)
