@@ -518,12 +518,24 @@ namespace VideoGateway.PublisherUI
             }
             var rtsp = _txtRtsp.Text.Trim();
             if (string.IsNullOrEmpty(rtsp)) { MessageBox.Show("Indica la URL RTSP destino."); return; }
-
-            var codecArgs = _chkOriginalCodec.Checked 
-                ? "-c copy" 
+            var codecArgs = _chkOriginalCodec.Checked
+                ? "-c copy"
                 : "-c:v libx264 -preset ultrafast -tune zerolatency -c:a aac";
-                
-            var args = $"-re -i \"{file}\" {codecArgs} -f rtsp \"{rtsp}\" -rtsp_transport tcp";
+
+            // Detect URL scheme to set ffmpeg RTSP transport for input if needed
+            string inputTransportPrefix = string.Empty;
+            try
+            {
+                if (Uri.TryCreate(file, UriKind.Absolute, out var uri) && uri.Scheme.Equals("rtsp", StringComparison.OrdinalIgnoreCase))
+                {
+                    // User requirement: prefer UDP for RTSP
+                    inputTransportPrefix = "-rtsp_transport udp ";
+                }
+            }
+            catch { }
+
+            // Build ffmpeg args: place transport option before -i when reading RTSP inputs
+            var args = $"-re {inputTransportPrefix}-i \"{file}\" {codecArgs} -f rtsp \"{rtsp}\"";
             _txtLogs.Clear();
             AppendLog($"Publicando origen: {(isNetwork ? "Stream de Red" : Path.GetFileName(file))}");
             AppendLog($"Destino:    {rtsp}");
@@ -533,6 +545,16 @@ namespace VideoGateway.PublisherUI
             // Switch to logs tab
             var tabs = _txtLogs.Parent?.Parent as TabControl;
             if (tabs != null) tabs.SelectedIndex = 1;
+
+            // Ensure we show a preview in the embedded player before publishing
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(file)) PlayFile(file);
+            }
+            catch (Exception ex)
+            {
+                AppendLog("Preview error: " + ex.Message);
+            }
 
             _publisherProcess = ProcessRunner.StartProcess("ffmpeg", args, line =>
             {
