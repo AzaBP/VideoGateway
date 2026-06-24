@@ -361,14 +361,32 @@ namespace VideoGateway.SubscriberUI
             // Detect input video/audio codecs with ffprobe (if available) and log them
             try
             {
-                var (vcodec, acodec) = VideoGateway.Testing.Common.MediaInfo.DetectCodecsWithFfprobe(url);
-                var v = vcodec ?? "unknown";
-                var a = acodec ?? "unknown";
-                AppendLog($"Formato recibido: video={v}, audio={a}.");
-                try { _lblFormatIn.Text = $"Formato recibido: video={v}, audio={a}"; } catch { }
-                if (!string.Equals(vcodec, "h264", StringComparison.OrdinalIgnoreCase) || !string.Equals(acodec, "aac", StringComparison.OrdinalIgnoreCase))
+                var det = VideoGateway.Testing.Common.MediaInfo.DetectStreamInfoViaFfprobe(url, 3000);
+                if (det != null)
                 {
-                    AppendLog("[WARN] Formato recibido no es H.264/AAC. Puede no ser compatible con algunos clientes RTSP/VLC.");
+                    var v = det.VideoCodec ?? "unknown";
+                    var a = det.AudioCodec ?? "unknown";
+                    AppendLog($"Formato recibido: video={v}, audio={a} (fuente: {det.Source}).");
+                    try { _lblFormatIn.Text = $"Formato recibido: video={v}, audio={a} ({det.Source})"; } catch { }
+                    try
+                    {
+                        if (string.Equals(v, "h264", StringComparison.OrdinalIgnoreCase) && string.Equals(a, "aac", StringComparison.OrdinalIgnoreCase))
+                            _lblFormatIn.ForeColor = AccentGreen;
+                        else if (string.Equals(v, "unknown", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "unknown", StringComparison.OrdinalIgnoreCase))
+                            _lblFormatIn.ForeColor = DimTextColor;
+                        else
+                            _lblFormatIn.ForeColor = AccentRed;
+                    }
+                    catch { }
+                    if (!string.Equals(v, "h264", StringComparison.OrdinalIgnoreCase) || !string.Equals(a, "aac", StringComparison.OrdinalIgnoreCase))
+                    {
+                        AppendLog("[WARN] Formato recibido no es H.264/AAC. Puede no ser compatible con algunos clientes RTSP/VLC.");
+                    }
+                }
+                else
+                {
+                    AppendLog("No fue posible detectar codecs con ffprobe (udp/tcp). Se usará fallback a LibVLC para metadata.");
+                    try { _lblFormatIn.Text = "Formato recibido: unknown (ffprobe failed)"; _lblFormatIn.ForeColor = DimTextColor; } catch { }
                 }
             }
             catch { AppendLog("No fue posible detectar codecs de red (ffprobe no disponible o fallo).\n"); }

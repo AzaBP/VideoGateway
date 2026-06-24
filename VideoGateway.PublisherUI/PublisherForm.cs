@@ -548,18 +548,37 @@ namespace VideoGateway.PublisherUI
             // Detect codecs for clearer logging
             try
             {
-                var (vcodec, acodec) = VideoGateway.Testing.Common.MediaInfo.DetectCodecsWithFfprobe(file);
-                var v = vcodec ?? "unknown";
-                var a = acodec ?? "unknown";
-                AppendLog($"Formato a enviar: video={v}, audio={a}");
-                try { _lblFormatOut.Text = $"Formato a enviar: video={v}, audio={a}"; } catch { }
-                if (!string.Equals(vcodec, "h264", StringComparison.OrdinalIgnoreCase) || !string.Equals(acodec, "aac", StringComparison.OrdinalIgnoreCase))
+                var det = VideoGateway.Testing.Common.MediaInfo.DetectStreamInfoViaFfprobe(file, 3000);
+                if (det != null)
                 {
-                    AppendLog("Nota: formato no nativo H.264/AAC — se aplicará transcodificación según la configuración.");
+                    var v = det.VideoCodec ?? "unknown";
+                    var a = det.AudioCodec ?? "unknown";
+                    AppendLog($"Formato a enviar: video={v}, audio={a} (fuente: {det.Source})");
+                    try { _lblFormatOut.Text = $"Formato a enviar: video={v}, audio={a} ({det.Source})"; } catch { }
+                    // color label
+                    try
+                    {
+                        if (string.Equals(v, "h264", StringComparison.OrdinalIgnoreCase) && string.Equals(a, "aac", StringComparison.OrdinalIgnoreCase))
+                            _lblFormatOut.ForeColor = AccentGreen;
+                        else if (string.Equals(v, "unknown", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "unknown", StringComparison.OrdinalIgnoreCase))
+                            _lblFormatOut.ForeColor = AccentYellow;
+                        else
+                            _lblFormatOut.ForeColor = AccentRed;
+                    }
+                    catch { }
+                    if (!string.Equals(v, "h264", StringComparison.OrdinalIgnoreCase) || !string.Equals(a, "aac", StringComparison.OrdinalIgnoreCase))
+                    {
+                        AppendLog("Nota: formato no nativo H.264/AAC — se aplicará transcodificación según la configuración.");
+                    }
+                    else
+                    {
+                        AppendLog("Formato H.264/AAC detectado — se puede usar copia directa (-c copy) para ahorrar CPU si es apropiado.");
+                    }
                 }
                 else
                 {
-                    AppendLog("Formato H.264/AAC detectado — se puede usar copia directa (-c copy) para ahorrar CPU si es apropiado.");
+                    AppendLog("No se pudo detectar codecs de entrada con ffprobe (udp/tcp). Se usará fallback a LibVLC para metadata.");
+                    try { _lblFormatOut.Text = "Formato a enviar: unknown (ffprobe failed)"; _lblFormatOut.ForeColor = AccentYellow; } catch { }
                 }
             }
             catch { AppendLog("No se pudo detectar codecs de entrada (ffprobe no disponible o fallo)."); }
