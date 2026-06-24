@@ -537,6 +537,22 @@ namespace VideoGateway.PublisherUI
             catch { }
 
             // Build ffmpeg args: place transport option before -i when reading RTSP inputs
+            // Detect codecs for clearer logging
+            try
+            {
+                var (vcodec, acodec) = VideoGateway.Testing.Common.MediaInfo.DetectCodecsWithFfprobe(file);
+                AppendLog($"Formato a enviar: video={(vcodec ?? "unknown")}, audio={(acodec ?? "unknown")}");
+                if (!string.Equals(vcodec, "h264", StringComparison.OrdinalIgnoreCase) || !string.Equals(acodec, "aac", StringComparison.OrdinalIgnoreCase))
+                {
+                    AppendLog("Nota: formato no nativo H.264/AAC — se aplicará transcodificación según la configuración.");
+                }
+                else
+                {
+                    AppendLog("Formato H.264/AAC detectado — se puede usar copia directa (-c copy) para ahorrar CPU si es apropiado.");
+                }
+            }
+            catch { AppendLog("No se pudo detectar codecs de entrada (ffprobe no disponible o fallo)."); }
+
             var args = $"-re {inputTransportPrefix}-i \"{file}\" {codecArgs} -f rtsp \"{rtsp}\"";
             _txtLogs.Clear();
             AppendLog($"Publicando origen: {(isNetwork ? "Stream de Red" : Path.GetFileName(file))}");

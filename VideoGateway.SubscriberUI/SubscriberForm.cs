@@ -350,13 +350,17 @@ namespace VideoGateway.SubscriberUI
 
             AppendLog($"Conectando a: {url} …");
 
-            // Detect input format with ffprobe (if available) and log it to help debugging
+            // Detect input video/audio codecs with ffprobe (if available) and log them
             try
             {
-                var fmt = VideoGateway.Testing.Common.MediaInfo.DetectFormatWithFfprobe(url);
-                AppendLog($"Formato detectado (entrada): {fmt}");
+                var (vcodec, acodec) = VideoGateway.Testing.Common.MediaInfo.DetectCodecsWithFfprobe(url);
+                AppendLog($"Formato recibido: video={(vcodec ?? "unknown")}, audio={(acodec ?? "unknown")}.");
+                if (!string.Equals(vcodec, "h264", StringComparison.OrdinalIgnoreCase) || !string.Equals(acodec, "aac", StringComparison.OrdinalIgnoreCase))
+                {
+                    AppendLog("[WARN] Formato recibido no es H.264/AAC. Puede no ser compatible con algunos clientes RTSP/VLC.");
+                }
             }
-            catch { }
+            catch { AppendLog("No fue posible detectar codecs de red (ffprobe no disponible o fallo).\n"); }
 
             if (_vlcAvailable && _mediaPlayer != null && _libVLC != null)
             {

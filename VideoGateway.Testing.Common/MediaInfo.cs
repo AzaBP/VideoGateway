@@ -31,6 +31,41 @@ namespace VideoGateway.Testing.Common
         }
 
         /// <summary>
+        /// Attempts to retrieve the first video and audio codec names using ffprobe.
+        /// Returns (videoCodec, audioCodec) where each can be null if not found.
+        /// </summary>
+        public static (string? videoCodec, string? audioCodec) DetectCodecsWithFfprobe(string path)
+        {
+            string? GetCodec(string streamSpecifier)
+            {
+                try
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "ffprobe",
+                        Arguments = $"-v error -select_streams {streamSpecifier} -show_entries stream=codec_name -of default=nw=1:nk=1 \"{path}\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    };
+
+                    using var p = Process.Start(psi);
+                    if (p == null) return null;
+                    var outp = p.StandardOutput.ReadLine();
+                    p.WaitForExit(1500);
+                    if (!string.IsNullOrWhiteSpace(outp)) return outp.Trim();
+                }
+                catch { }
+                return null;
+            }
+
+            var v = GetCodec("v:0");
+            var a = GetCodec("a:0");
+            return (v, a);
+        }
+
+        /// <summary>
         /// Attempts to retrieve the first video stream's width and height using ffprobe.
         /// Returns null on failure or when ffprobe is not available.
         /// </summary>
