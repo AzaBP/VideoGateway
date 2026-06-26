@@ -1,0 +1,15 @@
+{
+  "$schema": "https://open-code.ai/config.json",
+  "mcp": {
+    "videogateway-analyzer": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ],
+      "enabled": true
+    }
+  }
+}

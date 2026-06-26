@@ -1,0 +1,24 @@
+# Auto-detect text files and normalize them in the repository
+* text=auto
+
+# Explicit text handling for common source files
+*.cs     text
+*.csproj text
+*.sln    text
+*.json   text
+*.xml    text
+*.config text
+*.xaml   text
+*.md     text
+
+# Binary files
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.dll    binary
+*.exe    binary
+
+# Prevent line-ending normalization for VS indexing files
+.vs/** -text

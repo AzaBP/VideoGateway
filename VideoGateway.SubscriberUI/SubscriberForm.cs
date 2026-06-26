@@ -1,11 +1,6 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using VideoGateway.Testing.Common;
 using LibVLCSharp.Shared;
 using LibVLCSharp.WinForms;
@@ -40,16 +35,12 @@ namespace VideoGateway.SubscriberUI
         private readonly Label    _lblStatus = new() { AutoSize = false       };
         private readonly Label    _lblInfo   = new() { AutoSize = false       };
         private readonly TextBox  _txtLog    = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
-        private readonly Label     _lblFormatIn = new() { AutoSize = false };
 
         // Embedded player
         private VideoView?   _videoView;
         private LibVLC?      _libVLC;
         private MediaPlayer? _mediaPlayer;
         private bool         _vlcAvailable;
-        // UDP listener for dynamic URL reception
-        private CancellationTokenSource? _udpListenerCts;
-        private const int UdpListenerPort = 50000;
 
         // ─────────────────────────────────────────────────────────────────────────
         public SubscriberForm()
@@ -64,113 +55,8 @@ namespace VideoGateway.SubscriberUI
 
             BuildLayout();
             WireEvents();
-            StartUdpUrlListener();
-            // Initialize LibVLC asynchronously to avoid startup hangs
-            Task.Run(() => TryInitializeLibVLCAsync());
             AppendLog("Subscriber listo. Introduce una URL RTSP y pulsa Conectar.");
             AppendLog($"Formato recomendado: H.264 / AAC — compatible con MediaMTX, VLC y FFplay.");
-        }
-
-        private void TryInitializeLibVLCAsync()
-        {
-            try
-            {
-                // Attempt to create LibVLC in background; if it succeeds, create UI controls on UI thread
-                var lib = new LibVLC(new[] { "--verbose=2" });
-                lib.Log += (s, e) => AppendLog($"VLC: {e.Message}");
-                var mediaPlayer = new MediaPlayer(lib);
-                BeginInvoke(() =>
-                {
-                    try
-                    {
-                        _libVLC = lib;
-                        _mediaPlayer = mediaPlayer;
-                        // Remove existing placeholder and add VideoView
-                        if (_videoView != null) { }
-                        var parent = Controls.OfType<SplitContainer>().FirstOrDefault()?.Panel1;
-                        if (parent != null)
-                        {
-                            parent.Controls.Clear();
-                            _videoView = new VideoView { MediaPlayer = _mediaPlayer, Dock = DockStyle.Fill };
-                            parent.Controls.Add(_videoView);
-                        }
-                        _vlcAvailable = true;
-                        AppendLog("LibVLC inicializado correctamente.");
-                    }
-                    catch (Exception ex)
-                    {
-                        AppendLog("Error inicializando UI LibVLC: " + ex.Message);
-                    }
-                });
-            }
-            catch (Exception ex)
-            {
-                AppendLog("LibVLC native init failed: " + ex.Message);
-            }
-        }
-
-        private void StartUdpUrlListener()
-        {
-            try
-            {
-                _udpListenerCts = new CancellationTokenSource();
-                var ct = _udpListenerCts.Token;
-                Task.Run(async () =>
-                {
-                    using var client = new UdpClient(UdpListenerPort);
-                    AppendLog($"UDP URL listener started on port {UdpListenerPort} (send a plain URL or JSON {{\"url\":\"rtsp://...\"}}).");
-                    while (!ct.IsCancellationRequested)
-                    {
-                        try
-                        {
-                            var res = await client.ReceiveAsync(ct);
-                            var text = string.Empty;
-                            try { text = Encoding.UTF8.GetString(res.Buffer).Trim(); } catch { }
-                            if (string.IsNullOrWhiteSpace(text)) continue;
-
-                            // Accept either raw URL or JSON with a url field
-                            string? url = null;
-                            if (text.StartsWith("{"))
-                            {
-                                try
-                                {
-                                    // crude JSON parse to avoid adding dependencies
-                                    var idx = text.IndexOf("\"url\"", StringComparison.OrdinalIgnoreCase);
-                                    if (idx >= 0)
-                                    {
-                                        var colon = text.IndexOf(':', idx);
-                                        if (colon >= 0)
-                                        {
-                                            var start = text.IndexOf('"', colon + 1);
-                                            var end = text.IndexOf('"', start + 1);
-                                            if (start >= 0 && end > start) url = text.Substring(start + 1, end - start - 1);
-                                        }
-                                    }
-                                }
-                                catch { }
-                            }
-                            else
-                            {
-                                url = text;
-                            }
-
-                            if (!string.IsNullOrWhiteSpace(url))
-                            {
-                                BeginInvoke(() =>
-                                {
-                                    AppendLog($"UDP: received URL -> {url}");
-                                    _txtRtsp.Text = url;
-                                    // Auto-connect: simulate play click
-                                    try { BtnPlay_Click(this, EventArgs.Empty); } catch { }
-                                });
-                            }
-                        }
-                        catch (OperationCanceledException) { break; }
-                        catch (Exception ex) { AppendLog("UDP listener error: " + ex.Message); await Task.Delay(500, ct); }
-                    }
-                }, ct);
-            }
-            catch (Exception ex) { AppendLog("Unable to start UDP listener: " + ex.Message); }
         }
 
         // ── Layout ───────────────────────────────────────────────────────────────
@@ -294,25 +180,27 @@ namespace VideoGateway.SubscriberUI
 
         private void BuildVideoPanel(SplitterPanel panel)
         {
-            // At startup we do not block trying to load native LibVLC synchronously
-            // Create a placeholder label; LibVLC will be initialized asynchronously
-            _vlcAvailable = false;
-            // Format label above the video view
-            StyleLabel(_lblFormatIn);
-            _lblFormatIn.Dock = DockStyle.Top;
-            _lblFormatIn.Height = 20;
-            _lblFormatIn.Text = "Formato recibido: -";
-            panel.Controls.Add(_lblFormatIn);
-
-            var placeholder = new Label
+            try
             {
-                Text      = "Cargando reproductor embebido...",
-                ForeColor = DimTextColor,
-                Dock      = DockStyle.Fill,
-                TextAlign = ContentAlignment.MiddleCenter,
-                Font      = new Font("Segoe UI", 10.5F, FontStyle.Regular)
-            };
-            panel.Controls.Add(placeholder);
+                _libVLC      = new LibVLC();
+                _mediaPlayer = new MediaPlayer(_libVLC);
+                _videoView   = new VideoView { MediaPlayer = _mediaPlayer, Dock = DockStyle.Fill };
+                panel.Controls.Add(_videoView);
+                _vlcAvailable = true;
+            }
+            catch
+            {
+                _vlcAvailable = false;
+                var lbl = new Label
+                {
+                    Text      = "Reproductor embebido no disponible.\n(LibVLC nativo no cargado)\n\nUsa el botón \"VLC ext.\" para abrir externamente.",
+                    ForeColor = AccentRed,
+                    Dock      = DockStyle.Fill,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Font      = new Font("Segoe UI", 10.5F, FontStyle.Bold)
+                };
+                panel.Controls.Add(lbl);
+            }
         }
 
         private void BuildLogPanel(SplitterPanel panel)
@@ -358,83 +246,11 @@ namespace VideoGateway.SubscriberUI
 
             AppendLog($"Conectando a: {url} …");
 
-            // Detect input video/audio codecs with ffprobe (if available) and log them
-            try
-            {
-                var det = VideoGateway.Testing.Common.MediaInfo.DetectStreamInfoViaFfprobe(url, 3000);
-                if (det != null)
-                {
-                    var v = det.VideoCodec ?? "unknown";
-                    var a = det.AudioCodec ?? "unknown";
-                    AppendLog($"Formato recibido: video={v}, audio={a} (fuente: {det.Source}).");
-                    try { _lblFormatIn.Text = $"Formato recibido: video={v}, audio={a} ({det.Source})"; } catch { }
-                    try
-                    {
-                        if (string.Equals(v, "h264", StringComparison.OrdinalIgnoreCase) && string.Equals(a, "aac", StringComparison.OrdinalIgnoreCase))
-                            _lblFormatIn.ForeColor = AccentGreen;
-                        else if (string.Equals(v, "unknown", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "unknown", StringComparison.OrdinalIgnoreCase))
-                            _lblFormatIn.ForeColor = DimTextColor;
-                        else
-                            _lblFormatIn.ForeColor = AccentRed;
-                    }
-                    catch { }
-                    if (!string.Equals(v, "h264", StringComparison.OrdinalIgnoreCase) || !string.Equals(a, "aac", StringComparison.OrdinalIgnoreCase))
-                    {
-                        AppendLog("[WARN] Formato recibido no es H.264/AAC. Puede no ser compatible con algunos clientes RTSP/VLC.");
-                    }
-                }
-                else
-                {
-                    AppendLog("No fue posible detectar codecs con ffprobe (udp/tcp). Se usará fallback a LibVLC para metadata.");
-                    try { _lblFormatIn.Text = "Formato recibido: unknown (ffprobe failed)"; _lblFormatIn.ForeColor = DimTextColor; } catch { }
-                }
-            }
-            catch { AppendLog("No fue posible detectar codecs de red (ffprobe no disponible o fallo).\n"); }
-
             if (_vlcAvailable && _mediaPlayer != null && _libVLC != null)
             {
                 try
                 {
                     var media = new Media(_libVLC, url, FromType.FromLocation);
-                    // Try to detect resolution via ffprobe and force aspect ratio so the full image is visible (letterbox)
-                    try
-                    {
-                        var res = VideoGateway.Testing.Common.MediaInfo.DetectVideoResolutionWithFfprobe(url);
-                        if (res.HasValue)
-                        {
-                            media.AddOption($":aspect-ratio={res.Value.width}:{res.Value.height}");
-                            AppendLog($"Forzando aspect-ratio {res.Value.width}:{res.Value.height} para mostrar imagen completa.");
-                        }
-                    }
-                    catch { }
-                    // Prefer UDP transport and increase cache for unstable networks
-                    media.AddOption(":rtsp-transport=udp");
-                    media.AddOption(":network-caching=3000");
-                    media.AddOption(":no-video-title-show");
-
-                    // Parse media metadata asynchronously to avoid blocking the UI thread.
-                    var parsed = false;
-                    media.ParsedChanged += (_, __) =>
-                    {
-                        try
-                        {
-                            parsed = true;
-                            AppendLog("Media parsed (network). See ffprobe for detailed streams.");
-                        }
-                        catch { }
-                    };
-
-                    // Use background parsing to avoid blocking the UI thread
-                    Task.Run(() =>
-                    {
-                        try { media.Parse(MediaParseOptions.ParseNetwork); } catch { }
-                    });
-                    Task.Run(async () =>
-                    {
-                        await Task.Delay(5000);
-                        if (!parsed) AppendLog("Warning: media parse timeout (still waiting for metadata).");
-                    });
-
                     _mediaPlayer.Stop();
                     _mediaPlayer.Play(media);
                     _mediaPlayer.Volume = _trkVolume.Value;
@@ -596,7 +412,6 @@ namespace VideoGateway.SubscriberUI
         {
             base.OnFormClosing(e);
             try { _mediaPlayer?.Stop(); _mediaPlayer?.Dispose(); _libVLC?.Dispose(); _videoView?.Dispose(); } catch { }
-            try { _udpListenerCts?.Cancel(); _udpListenerCts?.Dispose(); } catch { }
         }
     }
 }

@@ -2,28 +2,23 @@
 bin/
 obj/
 *.user
-*.sourcelink.json
-*.log
-*.tmp
-*.cache
-packages/
-*.nupkg
-.vscode/
-*.DS_Store
-
-# .NET / Visual Studio specifics
-*.user
 *.suo
 *.userosscache
 *.sln.ide
+.vscode/
+*.log
 
-# LibVLC / VideoLAN native outputs (no subir)
-**/libvlc/
-**/libvlc/**/*
-**/plugins/**
+# Rider
+.idea/
+*.sln.iml
 
-# Other
-*.exe
-*.dll
-*.pdb
+# NuGet
+*.nupkg
+packages/
 
+# Build outputs
+dist/
+
+# OS files
+Thumbs.db
+.DS_Store

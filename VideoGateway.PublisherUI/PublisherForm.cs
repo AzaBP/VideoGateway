@@ -7,8 +7,6 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
-using System.Net;
-using System.Net.Sockets;
 using System.Windows.Forms;
 using VideoGateway.Testing.Common;
 using LibVLCSharp.Shared;
@@ -43,7 +41,6 @@ namespace VideoGateway.PublisherUI
         private readonly Button  _btnBrowse  = new() { Text = "📂  Examinar"   };
         private readonly Button  _btnConfig  = new() { Text = "⚙  Config"      };
         private readonly Label   _lblStatus  = new() { AutoSize = false         };
-        private readonly Label   _lblFormatOut = new() { AutoSize = false };
 
         // ── Detail panel controls ────────────────────────────────────────────────
         private readonly TextBox _txtMetadata = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
@@ -286,13 +283,6 @@ namespace VideoGateway.PublisherUI
             StyleTrackBar(_trkVolume); _trkVolume.Height = 22;
             pbBar.Controls.AddRange(new Control[] { _btnPreview, _btnStopPb, lblVol, _trkVolume });
 
-            // Format label (shows detected outgoing codecs)
-            StyleLabel(_lblFormatOut);
-            _lblFormatOut.Dock = DockStyle.Top;
-            _lblFormatOut.Height = 20;
-            _lblFormatOut.Text = "Formato a enviar: -";
-            panel.Controls.Add(_lblFormatOut);
-
             // Video view
             try
             {
@@ -491,23 +481,7 @@ namespace VideoGateway.PublisherUI
             _btnPublish.Click += BtnPublish_Click;
             _btnStop.Click    += BtnStop_Click;
             _btnConfig.Click  += (_, _) => { using var d = new SettingsForm(); d.ShowDialog(this); };
-            _btnPreview.Click += (_, _) =>
-            {
-                var url = _txtInputUrl.Text?.Trim();
-                if (!string.IsNullOrEmpty(url))
-                {
-                    PlayFile(url);
-                    return;
-                }
-
-                if (_selectedCard != null)
-                {
-                    PlayFile(_selectedCard.FilePath);
-                    return;
-                }
-
-                MessageBox.Show("Selecciona un vídeo o pega una URL de stream para previsualizar.", "Preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            };
+            _btnPreview.Click += (_, _) => { if (_selectedCard != null) PlayFile(_selectedCard.FilePath); };
             _btnStopPb.Click  += (_, _) => { try { _mediaPlayer?.Stop(); } catch { } SetStatus("Reproducción detenida.", TextColor); };
             _trkVolume.Scroll += (_, _) => { try { if (_mediaPlayer != null) _mediaPlayer.Volume = _trkVolume.Value; } catch { } };
         }
@@ -528,98 +502,21 @@ namespace VideoGateway.PublisherUI
             }
             var rtsp = _txtRtsp.Text.Trim();
             if (string.IsNullOrEmpty(rtsp)) { MessageBox.Show("Indica la URL RTSP destino."); return; }
-            var codecArgs = _chkOriginalCodec.Checked
-                ? "-c copy"
+
+            var codecArgs = _chkOriginalCodec.Checked 
+                ? "-c copy" 
                 : "-c:v libx264 -preset ultrafast -tune zerolatency -c:a aac";
-
-            // Detect URL scheme to set ffmpeg RTSP transport for input if needed
-            string inputTransportPrefix = string.Empty;
-            try
-            {
-                if (Uri.TryCreate(file, UriKind.Absolute, out var uri) && uri.Scheme.Equals("rtsp", StringComparison.OrdinalIgnoreCase))
-                {
-                    // User requirement: prefer UDP for RTSP
-                    inputTransportPrefix = "-rtsp_transport udp ";
-                }
-            }
-            catch { }
-
-            // Build ffmpeg args: place transport option before -i when reading RTSP inputs
-            // Detect codecs for clearer logging
-            try
-            {
-                var det = VideoGateway.Testing.Common.MediaInfo.DetectStreamInfoViaFfprobe(file, 3000);
-                if (det != null)
-                {
-                    var v = det.VideoCodec ?? "unknown";
-                    var a = det.AudioCodec ?? "unknown";
-                    AppendLog($"Formato a enviar: video={v}, audio={a} (fuente: {det.Source})");
-                    try { _lblFormatOut.Text = $"Formato a enviar: video={v}, audio={a} ({det.Source})"; } catch { }
-                    // color label
-                    try
-                    {
-                        if (string.Equals(v, "h264", StringComparison.OrdinalIgnoreCase) && string.Equals(a, "aac", StringComparison.OrdinalIgnoreCase))
-                            _lblFormatOut.ForeColor = AccentGreen;
-                        else if (string.Equals(v, "unknown", StringComparison.OrdinalIgnoreCase) || string.Equals(a, "unknown", StringComparison.OrdinalIgnoreCase))
-                            _lblFormatOut.ForeColor = AccentYellow;
-                        else
-                            _lblFormatOut.ForeColor = AccentRed;
-                    }
-                    catch { }
-                    if (!string.Equals(v, "h264", StringComparison.OrdinalIgnoreCase) || !string.Equals(a, "aac", StringComparison.OrdinalIgnoreCase))
-                    {
-                        AppendLog("Nota: formato no nativo H.264/AAC — se aplicará transcodificación según la configuración.");
-                    }
-                    else
-                    {
-                        AppendLog("Formato H.264/AAC detectado — se puede usar copia directa (-c copy) para ahorrar CPU si es apropiado.");
-                    }
-                }
-                else
-                {
-                    AppendLog("No se pudo detectar codecs de entrada con ffprobe (udp/tcp). Se usará fallback a LibVLC para metadata.");
-                    try { _lblFormatOut.Text = "Formato a enviar: unknown (ffprobe failed)"; _lblFormatOut.ForeColor = AccentYellow; } catch { }
-                }
-            }
-            catch { AppendLog("No se pudo detectar codecs de entrada (ffprobe no disponible o fallo)."); }
-
-            var args = $"-re {inputTransportPrefix}-i \"{file}\" {codecArgs} -f rtsp \"{rtsp}\"";
+                
+            var args = $"-re -i \"{file}\" {codecArgs} -f rtsp \"{rtsp}\" -rtsp_transport tcp";
             _txtLogs.Clear();
             AppendLog($"Publicando origen: {(isNetwork ? "Stream de Red" : Path.GetFileName(file))}");
             AppendLog($"Destino:    {rtsp}");
             AppendLog($"Comando:    ffmpeg {args}");
             AppendLog(new string('─', 60));
 
-            // Send the input URL to any running Subscriber via UDP so it can auto-connect.
-            try
-            {
-                var subscriberHost = Environment.GetEnvironmentVariable("VIDEOGATEWAY_SUBSCRIBER_HOST") ?? "127.0.0.1";
-                var subscriberPortStr = Environment.GetEnvironmentVariable("VIDEOGATEWAY_SUBSCRIBER_PORT");
-                var subscriberPort = 50000;
-                if (!string.IsNullOrEmpty(subscriberPortStr) && int.TryParse(subscriberPortStr, out var p)) subscriberPort = p;
-                using var udp = new UdpClient();
-                var msg = Encoding.UTF8.GetBytes(file);
-                udp.Send(msg, msg.Length, subscriberHost, subscriberPort);
-                AppendLog($"UDP: sent URL to {subscriberHost}:{subscriberPort}");
-            }
-            catch (Exception ex)
-            {
-                AppendLog("UDP send failed: " + ex.Message);
-            }
-
             // Switch to logs tab
             var tabs = _txtLogs.Parent?.Parent as TabControl;
             if (tabs != null) tabs.SelectedIndex = 1;
-
-            // Ensure we show a preview in the embedded player before publishing
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(file)) PlayFile(file);
-            }
-            catch (Exception ex)
-            {
-                AppendLog("Preview error: " + ex.Message);
-            }
 
             _publisherProcess = ProcessRunner.StartProcess("ffmpeg", args, line =>
             {
@@ -650,14 +547,7 @@ namespace VideoGateway.PublisherUI
             {
                 try
                 {
-                    var media = new Media(_libVLC, file, FromType.FromLocation);
-                    // For RTSP streams prefer UDP transport (user requirement)
-                    if (file.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase))
-                    {
-                        media.AddOption(":rtsp-transport=udp");
-                        media.AddOption(":network-caching=3000");
-                    }
-                    _mediaPlayer.Play(media);
+                    _mediaPlayer.Play(new Media(_libVLC, new Uri(file)));
                     _mediaPlayer.Volume = _trkVolume.Value;
                     SetStatus($"▶  Preview: {Path.GetFileName(file)}", AccentBlue);
                     return;
